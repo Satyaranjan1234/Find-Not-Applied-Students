@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Find Not Applied Students</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; margin: 20px; }
+        input, button { margin: 10px; padding: 8px; }
+        button { padding: 10px 15px; cursor: pointer; }
+        table { margin: 20px auto; border-collapse: collapse; width: 80%; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background: #f4f4f4; }
+    </style>
+</head>
+<body>
+
+    <h2>Upload Student Data</h2>
+    <label for="collegeFile"><b>📂 Upload All Students List:</b></label>
+    <input type="file" id="collegeFile" accept=".xlsx, .xls">
+    
+    <label for="scholarshipFile"><b>📂 Upload Scholarship Applied Students:</b></label>
+    <input type="file" id="scholarshipFile" accept=".xlsx, .xls">
+    
+    <button onclick="processFiles()">Find Not Applied Students</button>
+    
+
+    <h3>Not Applied Students</h3>
+    <table id="resultTable">
+        <thead>
+            <tr>
+                <th>Aadhaar No.</th>
+                <th>Student Name</th>
+                <th>Branch</th>
+                <th>Course Year</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+
+    <button onclick="downloadExcel()">Download as Excel</button>
+
+    <script>
+        let notAppliedStudents = [];
+
+        function processFiles() {
+            const collegeFile = document.getElementById("collegeFile").files[0];
+            const scholarshipFile = document.getElementById("scholarshipFile").files[0];
+
+            if (!collegeFile || !scholarshipFile) {
+                alert("Please upload both files!");
+                return;
+            }
+
+            Promise.all([readExcel(collegeFile), readExcel(scholarshipFile)]).then(([collegeStudents, scholarshipStudents]) => {
+                const appliedAadhaars = new Set(scholarshipStudents.map(row => row[0].toString().trim())); // Aadhaar No. as key
+
+                notAppliedStudents = collegeStudents.filter(row => !appliedAadhaars.has(row[0].toString().trim()));
+
+                displayResults(notAppliedStudents);
+            });
+        }
+
+        function readExcel(file) {
+            return new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: "array" });
+                    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+                    resolve(rows.slice(1)); // Remove header row
+                };
+                reader.readAsArrayBuffer(file);
+            });
+        }
+
+        function displayResults(list) {
+            const tbody = document.getElementById("resultTable").querySelector("tbody");
+            tbody.innerHTML = "";
+            list.forEach(row => {
+                let tr = tbody.insertRow();
+                row.forEach(cell => {
+                    let td = tr.insertCell();
+                    td.innerText = cell;
+                });
+            });
+        }
+
+        function downloadExcel() {
+            if (notAppliedStudents.length === 0) {
+                alert("No data to download!");
+                return;
+            }
+            const ws = XLSX.utils.aoa_to_sheet([["Aadhaar No.", "Student Name", "Branch", "Course Year"], ...notAppliedStudents]);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Not Applied Students");
+            XLSX.writeFile(wb, "Not_Applied_Students.xlsx");
+        }
+    </script>
+
+</body>
+</html>
